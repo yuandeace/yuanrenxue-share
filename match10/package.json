@@ -1,0 +1,17 @@
+{
+  "name": "match_10",
+  "version": "1.0.0",
+  "description": "",
+  "main": "bridge_cli.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "jquery": "^4.0.0",
+    "jsdom": "^29.0.1"
+  }
+}
