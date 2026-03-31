@@ -201,7 +201,7 @@ npm start
 - 每个关键结论必须有证据支撑（网络记录、Hook 输出、断点值、中间值对比）
 - 最终采集器必须是纯 Node.js，禁止浏览器自动化作为最终方案
 
-> 需要配合 `js-reverse MCP` 和 `chrome-devtool MCP` 使用。详见 [SKILL.md](./skill/yuanrenxue-js-reverse-agent/SKILL.md)。
+> 需要配合 [`JSReverser-MCP`](https://github.com/NoOne-hub/JSReverser-MCP) 和 `chrome-devtool MCP` 使用。详见 [SKILL.md](./skill/yuanrenxue-js-reverse-agent/SKILL.md)。
 
 ## 获取 sessionid
 
