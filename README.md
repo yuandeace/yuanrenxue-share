@@ -75,7 +75,7 @@ TraceXHR 拦截响应 → 提取数据 + k 值回写
 | **Node.js** (>= 18) | 运行环境、原生 `crypto` 模块 | 全部 |
 | **JSDOM** | 在 Node 中模拟浏览器 DOM，让混淆壳层脚本自然执行 | 第 10 题 |
 | **jQuery** | 复用页面原有的 AJAX 请求逻辑 | 第 10 题 |
-| **crypto** | AES / 3DES 解密、MD5 哈希 | 入门题 |
+| **crypto** | AES / 3DES 解密、MD5 哈希 | 突破题 |
 
 ## 快速开始
 
