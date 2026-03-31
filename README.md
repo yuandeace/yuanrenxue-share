@@ -84,7 +84,7 @@ TraceXHR 拦截响应 → 提取数据 + k 值回写
 - **Node.js >= 18**（需要原生 `fetch` 支持）
 - 猿人学平台账号（需要有效的 `sessionid`）
 
-### 入门题
+### 突破题
 
 ```bash
 cd match_foundation_early
