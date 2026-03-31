@@ -1,0 +1,23 @@
+{
+  "name": "match_10",
+  "version": "1.0.0",
+  "description": "猿人学第10题 - JS混淆/重放攻击对抗 - 纯Node.js协议解法",
+  "main": "main.js",
+  "scripts": {
+    "start": "node main.js"
+  },
+  "keywords": [
+    "yuanrenxue",
+    "js-reverse",
+    "anti-bot",
+    "jsdom",
+    "protocol-scraping"
+  ],
+  "author": "yuandeace",
+  "license": "MIT",
+  "type": "commonjs",
+  "dependencies": {
+    "jquery": "^4.0.0",
+    "jsdom": "^29.0.1"
+  }
+}
