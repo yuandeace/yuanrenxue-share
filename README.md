@@ -13,6 +13,7 @@
 |:---:|------|---------|:-------:|------|
 | 突破 | 五行灵气收集 | AES-128-ECB / 3DES-ECB 多算法候选解密、Base64 编码、MD5 哈希 | 密码学还原 | [match_foundation_early](./match_foundation_early/) |
 | 10 | JS 混淆 - 重放攻击对抗 | JSDOM 运行时还原、XHR 拦截、壳层 `m` 参数自动生成、k 值回写 | 运行时模拟 | [match_10](./match_10/) |
+| 18 | JS 逆向 - AES 动态加密 | AES-128-CBC 动态加密、服务端时间戳同步、XHR 劫持还原、UA 校验 | 密码学还原 | [match_18](./match_18/) |
 
 > 更多题目持续更新中...
 
@@ -66,16 +67,31 @@ TraceXHR 拦截响应 → 提取数据 + k 值回写
 
 **关键发现**：页面脚本里的 `window.token` 是障眼法，真正生效的是壳层对 XHR 的接管。每次响应的 `{"k":{"k":"变量名|数字"}}` 必须回写到 `window` 上，否则下一页请求会失败。
 
+### 第 18 题：JS 逆向 - AES 动态加密
+
+**目标**：请求全部 5 页数据，将 50 个数字全部加和。
+
+**解题链路**：
+
+```
+GET /api/v/question/18data?page=1 → 第 1 页直接请求
+    ↓
+GET /api/getTime → 服务端毫秒时间戳 → t = floor(ts / 1000)
+    ↓
+hex(t) 补齐 8 位，重复两次 → AES-128-CBC key & iv
+    ↓
+明文 "<page>|111m733,222d733,333u733" → AES 加密 → Base64 → v
+    ↓
+GET /api/v/question/18data?page=N&t=<t>&v=<v> → 第 2-4 页
+    ↓
+第 5 页同上，UA 改为 "yuanrenxue"
+    ↓
+50 个数字求和 → 最终答案
+```
+
+**关键发现**：第 1 页无需加密参数可直接请求；第 2-5 页前端通过重写 `Date.now` 和 `XMLHttpRequest.prototype.open` 自动注入 `t` 和 `v` 参数；加密算法为 AES-128-CBC + PKCS7，key/iv 由服务端时间戳的 hex 值重复拼接而成；第 5 页额外要求 UA 为 `yuanrenxue`。
+
 ---
-
-## 技术栈
-
-| 技术 | 用途 | 使用题目 |
-|------|------|---------|
-| **Node.js** (>= 18) | 运行环境、原生 `crypto` 模块 | 全部 |
-| **JSDOM** | 在 Node 中模拟浏览器 DOM，让混淆壳层脚本自然执行 | 第 10 题 |
-| **jQuery** | 复用页面原有的 AJAX 请求逻辑 | 第 10 题 |
-| **crypto** | AES / 3DES 解密、MD5 哈希 | 突破题 |
 
 ## 快速开始
 
@@ -93,7 +109,7 @@ npm install
 # 配置 sessionid
 export SESSIONID="your_sessionid_here"
 
-# 运行（仅计算，不提交）
+# 运行
 node main.js
 
 # 运行并提交答案（仅当页面轮次匹配时才会真正提交）
@@ -151,38 +167,35 @@ npm start
 ==============================
 ```
 
-## 项目结构
+### 第 18 题
+
+```bash
+cd match_18
+
+# 配置 sessionid
+# 编辑 config/session.json，填入你的 sessionid
+
+# 运行
+node main.js
+```
+
+输出示例：
 
 ```
-.
-├── README.md
-├── .gitignore
-│
-├── match_foundation_early/                # 入门题：五行灵气收集
-│   ├── main.js                            # 入口：解密五行灵气 → 拼接 → MD5 → 可选提交
-│   ├── package.json
-│   ├── README.md                          # 题目详细分析与通关证据
-│   ├── config/
-│   │   └── encrypt.js                     # 已验证轮次的常量（key、cipher、各灵气值）
-│   └── utils/
-│       ├── encrypt.js                     # 加解密工具：AES-128-ECB、3DES-ECB、Base64、MD5
-│       └── request.js                     # 页面抓取、轮次解析、答案提交
-│
-├── match_10/                              # 第 10 题：JS 混淆 - 重放攻击对抗
-│   ├── main.js                            # 入口：加载配置 → 采集 5 页 → 输出结果
-│   ├── package.json
-│   ├── README.md                          # 题目详细分析
-│   ├── config/
-│   │   ├── encrypt.js                     # 常量定义、URL 配置、本地资源映射
-│   │   └── session.json                   # 运行时配置（sessionid、UA、超时）
-│   └── utils/
-│       ├── encrypt.js                     # 核心引擎：JSDOM 运行时、XHR 拦截、浏览器环境模拟
-│       └── request.js                     # 采集调度：分页请求、数据汇总
-│
-└── skill/                                 # Claude Code 自动化解题 Agent
-    └── yuanrenxue-js-reverse-agent/
-        └── SKILL.md                       # Agent 技能定义
+[*] 题目：第18题 - JS 逆向 AES 动态加密
+[*] 目标：请求全部 5 页数据并将全部数字加和
+[+] 正在采集第 1/5 页...
+✓ 获取 10 条数据
+[+] 正在采集第 2/5 页...
+✓ 获取 10 条数据
+...
+[+] 采集完成，共 50 条数据
+
+========== 计算结果 ==========
+答案：XXXXXXX
+==============================
 ```
+
 
 ## Skill：自动化解题 Agent
 
