@@ -1,4 +1,16 @@
 const crypto = require("crypto");
+const { foundationDoDigest } = require("./foundation_do");
+const {
+  FOUNDATION_TI_BASE,
+  buildFoundationTiSeed,
+  buildFoundationTiKsa,
+  foundationTiTransformBytes,
+  foundationTiMask,
+  foundationTiEncodeString,
+  foundationTiDecodeString,
+  serializeFoundationQuestionData,
+  buildFoundationSignFromDigest,
+} = require("./foundation_ti");
 
 function base64NoPad(text) {
   return Buffer.from(text, "utf8").toString("base64").replace(/=+$/g, "");
@@ -84,6 +96,17 @@ function decryptEarthByCandidates(water, earthCipher) {
   return { algorithm: null, value: null, tries };
 }
 
+function buildFoundationQuestionDigest(data) {
+  return foundationDoDigest(serializeFoundationQuestionData(data));
+}
+
+function buildFoundationQuestionSign({ pathname, ts, data }) {
+  const serialized = serializeFoundationQuestionData(data);
+  const digest = foundationDoDigest(serialized);
+  const sign = buildFoundationSignFromDigest({ pathname, ts, digest });
+  return { serialized, digest, sign };
+}
+
 module.exports = {
   base64NoPad,
   md5,
@@ -91,4 +114,16 @@ module.exports = {
   decrypt3DesEcbRawKey,
   decryptGoldByCandidates,
   decryptEarthByCandidates,
+  FOUNDATION_TI_BASE,
+  buildFoundationTiSeed,
+  buildFoundationTiKsa,
+  foundationTiTransformBytes,
+  foundationTiMask,
+  foundationTiEncodeString,
+  foundationTiDecodeString,
+  foundationDoDigest,
+  serializeFoundationQuestionData,
+  buildFoundationSignFromDigest,
+  buildFoundationQuestionDigest,
+  buildFoundationQuestionSign,
 };
