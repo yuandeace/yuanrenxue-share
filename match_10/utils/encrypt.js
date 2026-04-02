@@ -169,6 +169,7 @@ function installRuntime(window, state, userAgent) {
     constructor() {
       super();
       this.__url = "";
+      // Capture the server-issued k value as soon as each page response lands.
       this.addEventListener("readystatechange", () => {
         if (this.readyState !== 4) return;
         if (!this.responseURL || !this.responseURL.includes("/api/question/10?page=")) return;
