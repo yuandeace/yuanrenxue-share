@@ -19,6 +19,12 @@ module.exports = {
       "16-byte key rounds frequently decrypt with AES-128-ECB",
       "8-byte key rounds can decrypt with 3DES-ECB using the raw key padded to 24 bytes",
     ],
+    requestFindings: [
+      "Fresh-page data changes almost every load; solve within one page instance.",
+      "Wrong gold/fire/wood with valid sign+ts yields fake water arg4 instead of hard failure.",
+      "The browser-side $.ajax wrapper appends sign and ts before delegating to jQuery.ajax.",
+      "A live paused frame exposed serialized sign input like 木=...&火=...&金=... plus /api/question/foundation_early|ts.",
+    ],
     signStatus: "Generic fresh-round __Do environment fitting in pure Node is still open.",
   },
 };
