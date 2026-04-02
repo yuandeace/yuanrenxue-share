@@ -1,0 +1,5 @@
+**/node_modules/
+
+match_foundation_early/analysis_data/
+
+*.log
