@@ -1,75 +1,91 @@
 # match_18
 
-## 题目信息
+## 这题在学什么
 
-- 题号：第 18 题
-- 题目：JS 逆向 - AES 动态加密
-- 目标：请求全部 5 页数据，将 50 个数字全部加和
-- 页面：`https://match.yuanrenxue.cn/match/18`
-- 登录态：需要 `sessionid`
+第 18 题适合练“服务端时间戳参与加密参数生成”的题型。
 
-## 解题思路
+页面前端会把时间戳转成十六进制，再重复拼成 AES 的 `key` 和 `iv`，最后把 `<page>|固定模板串` 加密成请求参数 `v`。
 
-### 接口链路
+## 核心结论
 
+- 第 1 页可以直接请求，不需要 `t` 和 `v`。
+- 第 2-5 页需要先请求 `/api/getTime`。
+- `t = floor(serverTime / 1000)`。
+- `hex(t).padStart(8, "0").repeat(2)` 同时作为 AES-128-CBC 的 `key` 与 `iv`。
+- 明文格式是 `<page>|111m733,222d733,333u733`。
+- 第 5 页额外需要 `User-Agent: yuanrenxue`。
+
+## 请求链
+
+```text
+GET /api/v/question/18data?page=1
+  -> 第 1 页直接拿数据
+
+GET /api/getTime
+  -> 取服务端毫秒时间戳
+  -> floor(ts / 1000) 得到秒级时间戳 t
+  -> 计算 key / iv
+  -> 生成 v
+
+GET /api/v/question/18data?page=N&t=<t>&v=<v>
+  -> 拉取第 2-4 页
+
+GET /api/v/question/18data?page=5&t=<t>&v=<v>
+  -> 同上，但 UA 必须为 yuanrenxue
 ```
-GET /api/v/question/18data?page=1 → 第 1 页（无需动态参数）
-    ↓
-GET /api/getTime → 获取服务端毫秒时间戳
-    ↓
-t = floor(serverTime / 1000) → 秒级时间戳
-    ↓
-hex(t) 补齐 8 位，重复两次 → AES-128-CBC key & iv
-    ↓
-明文 "<page>|111m733,222d733,333u733" → AES 加密 → Base64 → v
-    ↓
-GET /api/v/question/18data?page=N&t=<t>&v=<v> → 第 2-4 页
-    ↓
-第 5 页同上，但 User-Agent 必须为 "yuanrenxue"
-    ↓
-50 个数字求和 → 最终答案
+
+## 代码结构
+
+```text
+match_18/
+├── main.js
+├── README.md
+├── page_obfuscated_source.js
+├── config/
+│   ├── encrypt.js
+│   └── session.json
+└── utils/
+    ├── encrypt.js
+    └── request.js
 ```
 
-### 关键发现
+- `main.js`
+  读取登录态、逐页拉取、打印最终答案。
+- `config/encrypt.js`
+  放固定模板串，以及由时间戳推导 `key` 的辅助函数。
+- `utils/encrypt.js`
+  负责 AES-128-CBC 加密，生成参数 `v`。
+- `utils/request.js`
+  负责取服务端时间、拼请求、处理第 5 页 UA 特殊分支。
+- `page_obfuscated_source.js`
+  保留页面脚本快照，方便做静态对照。
 
-1. **第 1 页无需加密**：直接请求 `/api/v/question/18data?page=1` 即可获取数据
+## 运行
 
-2. **前端 XHR 劫持**：页面重写了 `Date.now` 和 `XMLHttpRequest.prototype.open`，将原始请求自动改写为带 `t` 和 `v` 参数的请求
-
-3. **AES-128-CBC + PKCS7**：
-   - `t` 取自 `/api/getTime` 返回值的秒级时间戳
-   - `hex(t)` 补齐到 8 位后重复两次，作为 16 字节 key 和 iv
-   - 示例：`t = 1774977100` → `hex = 69cc004c` → `key = iv = "69cc004c69cc004c"`
-
-4. **明文格式**：服务端校验的并非固定常量，而是满足格式的字符串，最小可用格式为 `<page>|111m733,222d733,333u733`
-
-5. **第 5 页 UA 校验**：第 5 页请求头 `User-Agent` 必须设为 `yuanrenxue`，否则返回空数据
-
-6. **环境检测**：普通 Puppeteer / Headless 环境下不会触发 XHR 改写链，说明前端存在环境判定
-
-## 使用方法
+优先使用环境变量：
 
 ```bash
-# 配置 sessionid
-# 编辑 config/session.json，填入你的 sessionid
-
-# 运行
+export MATCH18_SESSIONID="your_sessionid"
 node main.js
 ```
 
-## 文件说明
+也可以把登录态写进 `config/session.json`：
 
-```
-match_18/
-├── main.js                 # 入口：采集 5 页数据 → 求和 → 输出答案
-├── README.md               # 本文件
-├── obf.js                  # 页面混淆脚本（静态分析参考）
-├── page.html               # 抓取的页面 HTML（静态分析参考）
-├── config/
-│   ├── encrypt.js          # 常量定义、URL 配置、加密参数
-│   └── session.json        # 运行时配置（sessionid）
-└── utils/
-    ├── encrypt.js          # 加密工具：AES-128-CBC 加密、hex 转换
-    └── request.js          # 采集调度：getTime 获取、分页请求、数据汇总
+```json
+{
+  "sessionid": ""
+}
 ```
 
+## 分享时建议重点观察
+
+- 为什么第 1 页不需要加密参数，而后面几页需要。
+- 为什么题目要用服务端时间而不是本地时间。
+- `key` 和 `iv` 为什么会相同。
+- 第 5 页只在 UA 上多了一个校验。
+
+## 可以继续做的练习
+
+- 把某一页的明文、时间戳、十六进制串、Base64 密文全部打印出来，练习中间值比对。
+- 用固定输入给 `encryptToken()` 写个最小验证脚本。
+- 对照 `page_obfuscated_source.js` 找前端实际改写 `Date.now` 和 XHR 的位置。
