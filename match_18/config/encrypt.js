@@ -9,6 +9,7 @@ function buildKeyHex(timestampSeconds) {
 }
 
 function buildKeyString(timestampSeconds) {
+  // The page repeats the 8-hex timestamp chunk to form the 16-byte AES key and IV.
   const keyHex = buildKeyHex(timestampSeconds);
   return keyHex.repeat(2);
 }
