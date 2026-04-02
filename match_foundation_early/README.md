@@ -116,7 +116,7 @@ node main.js
 
 如果你只是想看主算法分享，不需要先折腾这些工具；直接从 `main.js`、`utils/foundation_do.js`、`utils/foundation_ti.js` 和 `RUNTIME_NOTES.md` 看起就够了。
 
-## 这题最值得学的点
+## 这题最值得分享的点
 
 - 算法族不止一个时，先做候选恢复，不要过早押注。
 - 浏览器差异不一定出在大对象，往往卡在 `toString`、索引访问、`item()` 这种细节语义。
