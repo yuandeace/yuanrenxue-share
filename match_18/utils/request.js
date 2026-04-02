@@ -40,6 +40,7 @@ async function getServerTimestamp(sessionid) {
 
 async function fetchPageData(page, sessionid) {
   if (page === 1) {
+    // Page 1 is the clean baseline request with no derived parameters.
     const { response, data, text } = await requestJson(`/api/v/question/18data?page=${page}`, {
       sessionid,
     });
@@ -53,6 +54,7 @@ async function fetchPageData(page, sessionid) {
 
   const timestampSeconds = await getServerTimestamp(sessionid);
   const token = encodeURIComponent(encryptToken(page, timestampSeconds));
+  // Page 5 adds a narrow UA check on top of the normal encrypted parameters.
   const userAgent = page === 5 ? "yuanrenxue" : undefined;
   const path = `/api/v/question/18data?page=${page}&t=${timestampSeconds}&v=${token}`;
   const { response, data, text } = await requestJson(path, {
