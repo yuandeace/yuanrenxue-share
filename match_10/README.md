@@ -1,81 +1,91 @@
-# 猿人学 JS 逆向挑战 - 纯 Node.js 协议解法
+# match_10
 
-猿人学（[match.yuanrenxue.cn](https://match.yuanrenxue.cn)）JS 逆向系列题目的**纯 Node.js 协议级解法**合集。
+## 这题在学什么
 
-不依赖浏览器自动化（Puppeteer / Playwright），全部通过 Node.js 直接发送 HTTP 请求完成数据采集。核心思路是用 JSDOM 在 Node 环境中还原页面运行时，让混淆后的壳层脚本自然执行，从而生成正确的请求参数。
+第 10 题适合拿来练“页面壳层接管请求”的思路。
 
+真正起作用的不是页面上显眼的变量，而是页面脚本对 `XMLHttpRequest` 的重写。只要把运行时环境还原到位，让壳层自然接管请求，动态参数就会自己生成。
 
+## 核心结论
 
-### 前置条件
+- 目标是拉取 5 页数据并求和。
+- 第 1 页不是手搓参数请求，而是等待页面初始化后自动发出。
+- 页面壳层会接管 `XMLHttpRequest`，并在请求时注入 `m`。
+- 每一页响应里的 `k.k = "变量名|数值"` 必须回写到 `window`，否则下一页会失败。
+- 第 5 页额外要求 `User-Agent: yuanrenxue`。
 
-- Node.js >= 18
-- 猿人学平台账号（需要有效的 `sessionid`）
+## 请求链
 
-### 运行示例（以第 10 题为例）
+```text
+GET /match/10
+  -> 页面脚本启动
+  -> 壳层接管 XMLHttpRequest
+  -> 自动拉取第 1 页
+  -> 读取响应里的 k 值并回写 window
+  -> 手动继续请求第 2-5 页
+  -> 第 5 页切换 UA 为 yuanrenxue
+  -> 汇总 50 个数字并求和
+```
+
+## 代码结构
+
+```text
+match_10/
+├── main.js
+├── package.json
+├── README.md
+├── config/
+│   ├── encrypt.js
+│   └── session.json
+└── utils/
+    ├── encrypt.js
+    └── request.js
+```
+
+- `main.js`
+  读取配置、启动采集、打印每页数据和最终答案。
+- `config/encrypt.js`
+  放页面 URL、默认 UA 和超时常量。
+- `config/session.json`
+  本地运行配置，建议只保留空模板。
+- `utils/encrypt.js`
+  创建 JSDOM 运行时、补齐最小浏览器环境、拦截并记录题目响应。
+- `utils/request.js`
+  按题目节奏串起 5 页请求，并计算总和。
+
+## 运行方式
 
 ```bash
-# 1. 克隆仓库
-git clone https://github.com/your-username/yuanrenxue-match.git
-cd yuanrenxue-match
-
-# 2. 进入题目目录并安装依赖
 cd match_10
 npm install
+```
 
-# 3. 配置 sessionid（二选一）
-# 方式一：编辑配置文件
-# 将你的 sessionid 填入 config/session.json
+二选一提供登录态：
 
-# 方式二：使用环境变量
-export MATCH10_SESSIONID="your_sessionid_here"
-
-# 4. 运行
+```bash
+export MATCH10_SESSIONID="your_sessionid"
 npm start
 ```
 
-### 输出示例
+或者编辑 `config/session.json`：
 
-```
-[*] 题目：第10题 - js 混淆 重放攻击对抗
-[*] 目标：请求全部 5 页数据并将全部数字加和
-[+] 正在采集第 1/5 页...
-✓ 获取 10 条数据
-[+] 正在采集第 2/5 页...
-✓ 获取 10 条数据
-...
-[+] 采集完成，共 50 条数据
-第 1 页: 113100, 607859, ...
-...
-
-========== 计算结果 ==========
-答案：XXXXXXX
-==============================
+```json
+{
+  "sessionid": "",
+  "userAgent": "Mozilla/5.0 ...",
+  "firstPageTimeoutMs": 10000
+}
 ```
 
-## 项目结构
+## 分享时建议重点观察
 
-```
-.
-├── README.md                  # 本文件
-├── .gitignore
-└── match_10/                  # 第 10 题
-    ├── main.js                # 入口：加载配置 → 采集 → 输出结果
-    ├── package.json
-    ├── README.md              # 题目详细分析
-    ├── config/
-    │   ├── encrypt.js         # 常量定义、URL 配置、本地资源映射
-    │   └── session.json       # 运行时配置（sessionid、UA、超时）
-    └── utils/
-        ├── encrypt.js         # 核心引擎：JSDOM 运行时创建、XHR 拦截、浏览器环境模拟
-        └── request.js         # 采集调度：分页请求、数据汇总
-```
+- 为什么第 1 页不能直接照搬后续请求逻辑。
+- 为什么 `window.token` 这类表面变量不是关键。
+- `TraceXHR` 在什么时机拿到响应并回写 `k`。
+- 第 5 页只改 UA 就能过，说明校验点很窄。
 
-## 获取 sessionid
+## 适合继续扩展的方向
 
-1. 登录 [猿人学](https://match.yuanrenxue.cn)
-2. 打开浏览器开发者工具（F12）
-3. 切换到 Application / Storage → Cookies
-4. 复制 `sessionid` 的值
-
-> 注意：sessionid 有时效性，过期后需要重新获取。
-
+- 把 `requestQuestionPage` 的请求与响应中间值单独打印出来，做浏览器对比。
+- 补一个最小验证脚本，只测 `applyQuestionKey` 的回写行为。
+- 在 README 里记录一次真实运行的分页样式，但不要提交真实登录态。
