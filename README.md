@@ -1,235 +1,128 @@
-# 猿人学 JS 逆向挑战 - 纯 Node.js 协议解法
+# 猿人学 JS 逆向分享仓库
 
-猿人学（[match.yuanrenxue.cn](https://match.yuanrenxue.cn)）JS 逆向系列题目的**纯 Node.js 协议级解法**合集。
+这个仓库整理的是猿人学题目的纯 Node.js 解法、研究脚本和复现笔记，目标不是“堆答案”，而是把每一题拆成可分享、可验证、可继续扩展的逆向过程。
 
-所有题目均不依赖浏览器自动化（Puppeteer / Playwright），全部通过 Node.js 直接发送 HTTP 请求完成数据采集与答案计算。
+仓库里保留了三类内容：
 
-只会有困难以上的题目
+- 可直接运行的 `main.js` 入口
+- 为还原算法服务的 `config/` 与 `utils/`
+- 为分享过程服务的探针、快照、解包结果和运行笔记
 
+## 设计原则
 
-## 已完成题目
+- 以分享讲解为主：README 优先解释请求链、参数来源、运行时差异和关键证据。
+- 以纯 Node.js 为主：浏览器工具只用于侦察、Hook、断点和比对，不作为最终采集方案。
+- 以脱敏分享为主：仓库不再保留真实 `sessionid`、绝对本机路径、直接可复用的实时候选答案。
+- 不破坏算法链路：真正参与解题的加密、请求调度和运行时拟合逻辑保持可运行。
 
-| 题号 | 题目 | 核心技术 | 解法类型 | 目录 |
-|:---:|------|---------|:-------:|------|
-| 突破 | 五行灵气收集 | AES-128-ECB / 3DES-ECB 多算法候选解密、Base64 编码、MD5 哈希 | 密码学还原 | [match_foundation_early](./match_foundation_early/) |
-| 10 | JS 混淆 - 重放攻击对抗 | JSDOM 运行时还原、XHR 拦截、壳层 `m` 参数自动生成、k 值回写 | 运行时模拟 | [match_10](./match_10/) |
-| 18 | JS 逆向 - AES 动态加密 | AES-128-CBC 动态加密、服务端时间戳同步、XHR 劫持还原、UA 校验 | 密码学还原 | [match_18](./match_18/) |
+## 目录约定
 
-> 更多题目持续更新中...
+- `main.js`
+  题目的最终入口，负责拉取数据、计算答案和打印结果。
+- `config/`
+  放题目常量、模板、样例配置，或必要的静态恢复数据。
+- `utils/`
+  放加密逻辑、运行时拟合和请求封装。
+- `probe_*.js`
+  研究脚本，用来做浏览器/JSDOM 侧验证。
+- `*_snapshot.*`
+  静态快照，便于离线复盘。
+- `*_output.json`
+  运行输出样例；仓库内版本已经脱敏，只保留结构和结论。
 
----
+## 题目导航
 
-## 题目概览
-
-### 突破题：五行灵气收集
-
-**目标**：收集金、火、木、水、土五种灵气，按 `金火木水土` 拼接后做 32 位小写 MD5。
-
-**解题链路**：
-
-```
-页面 HTML 中提取 key + cipher
-    ↓
-候选算法解密（AES-128-ECB / 3DES-ECB）→ 金灵气
-    ↓
-Base64 编码（去 padding）→ 火灵气
-    ↓
-页面固定值 → 木灵气
-    ↓
-提交金+火+木，服务端返回 → 水灵气
-    ↓
-水灵气作 key，解密土密文 → 土灵气
-    ↓
-拼接五行 → MD5 → 最终答案
-```
-
-**关键发现**：题目会轮换加密算法——16 位 key 用 AES-128-ECB，8 位 key 用 3DES-ECB（raw key 补齐 24 字节）。脚本自动候选尝试，无需手动判断。
-
-### 第 10 题：JS 混淆 - 重放攻击对抗
-
-**目标**：请求全部 5 页数据，将 50 个数字全部加和。
-
-**解题链路**：
-
-```
-GET /match/10 → 获取页面 HTML + 壳层脚本
-    ↓
-JSDOM 加载页面，壳层自然接管 XMLHttpRequest
-    ↓
-壳层重写 XHR.open/send → 自动注入 m= 参数
-    ↓
-TraceXHR 拦截响应 → 提取数据 + k 值回写
-    ↓
-循环请求 5 页（第 5 页 UA 改为 "yuanrenxue"）
-    ↓
-50 个数字求和 → 最终答案
-```
-
-**关键发现**：页面脚本里的 `window.token` 是障眼法，真正生效的是壳层对 XHR 的接管。每次响应的 `{"k":{"k":"变量名|数字"}}` 必须回写到 `window` 上，否则下一页请求会失败。
-
-### 第 18 题：JS 逆向 - AES 动态加密
-
-**目标**：请求全部 5 页数据，将 50 个数字全部加和。
-
-**解题链路**：
-
-```
-GET /api/v/question/18data?page=1 → 第 1 页直接请求
-    ↓
-GET /api/getTime → 服务端毫秒时间戳 → t = floor(ts / 1000)
-    ↓
-hex(t) 补齐 8 位，重复两次 → AES-128-CBC key & iv
-    ↓
-明文 "<page>|111m733,222d733,333u733" → AES 加密 → Base64 → v
-    ↓
-GET /api/v/question/18data?page=N&t=<t>&v=<v> → 第 2-4 页
-    ↓
-第 5 页同上，UA 改为 "yuanrenxue"
-    ↓
-50 个数字求和 → 最终答案
-```
-
-**关键发现**：第 1 页无需加密参数可直接请求；第 2-5 页前端通过重写 `Date.now` 和 `XMLHttpRequest.prototype.open` 自动注入 `t` 和 `v` 参数；加密算法为 AES-128-CBC + PKCS7，key/iv 由服务端时间戳的 hex 值重复拼接而成；第 5 页额外要求 UA 为 `yuanrenxue`。
-
----
+| 目录 | 状态 | 分享重点 | 说明 |
+| --- | --- | --- | --- |
+| [match_foundation_early](./match_foundation_early/) | 已整理 | 多算法候选解密、`Do` 运行时拟合、`Ti` 白盒还原、签名构造 | 当前更偏“轮次绑定复现 + 已分类算法族” |
+| [match_10](./match_10/) | 已整理 | JSDOM 运行时重建、XHR 接管、动态参数 `m`、`k` 值回写 | 典型的“页面壳层接管请求”题 |
+| [match_11](./match_11/) | 已整理 | 实时后缀提取、`SecretKey` 动态绑定、JSDOM Hook、研究探针 | 典型的“旧快照失效，必须绑定当前轮次”题 |
+| [match_18](./match_18/) | 已整理 | 服务端时间戳、AES-128-CBC、`t/v` 参数派生、UA 校验 | 典型的“时间戳派生密钥”题 |
 
 ## 快速开始
 
-### 前置条件
+### 1. 基础环境
 
-- **Node.js >= 18**（需要原生 `fetch` 支持）
-- 猿人学平台账号（需要有效的 `sessionid`）
+- Node.js 18 或更高版本
+- 猿人学有效登录态
+- 只在需要研究页面行为时再安装浏览器探针依赖
 
-### 突破题
+### 2. 登录态约定
+
+推荐优先使用环境变量，而不是把真实登录态写进文件：
 
 ```bash
-cd match_foundation_early
-npm install
+# 第 10 题
+export MATCH10_SESSIONID="your_sessionid"
 
-# 配置 sessionid
-export SESSIONID="your_sessionid_here"
+# 第 11 题
+export YRX_SESSIONID="your_sessionid"
 
-# 运行
-node main.js
+# 第 18 题
+export MATCH18_SESSIONID="your_sessionid"
 
-# 运行并提交答案（仅当页面轮次匹配时才会真正提交）
-SUBMIT=1 node main.js
+# foundation_early
+export SESSIONID="your_sessionid"
 ```
 
-输出示例：
-
-```
-[*] 题目：foundation_early
-[*] 说明：当前脚本复放已验证成功的一轮。该答案和当时那一轮题面绑定，不是跨轮次通用答案。
-[+] 已验证轮次
-    key=8T8Teq9Mxxxxx
-    cipher=2gtJpxxxxeYhKVMoZsP01TxlVoO65xV6/LA+
-    gold=aT9pxxxxxCcbqUQcdABEb
-    fire=YVQ5cxxxxxxxENjYnFVUWNkQUJFYg
-    wood=wood_reiki_yrx
-    water=dx0XxxxIE1f
-    earth=GzweWjQKn76WNZfw
-
-========== 计算结果 ==========
-答案：xxxxxxx
-==============================
-```
-
-### 第 10 题
+### 3. 直接运行题目
 
 ```bash
 cd match_10
 npm install
-
-# 配置 sessionid（二选一）
-# 方式一：编辑 config/session.json
-# 方式二：环境变量
-export MATCH10_SESSIONID="your_sessionid_here"
-
-# 运行
 npm start
 ```
 
-输出示例：
-
-```
-[*] 题目：第10题 - js 混淆 重放攻击对抗
-[*] 目标：请求全部 5 页数据并将全部数字加和
-[+] 正在采集第 1/5 页...
-✓ 获取 10 条数据
-[+] 正在采集第 2/5 页...
-✓ 获取 10 条数据
-...
-[+] 采集完成，共 50 条数据
-
-========== 计算结果 ==========
-答案：XXXXXXX
-==============================
-```
-
-### 第 18 题
-
 ```bash
-cd match_18
-
-# 配置 sessionid
-# 编辑 config/session.json，填入你的 sessionid
-
-# 运行
+cd match_11
+npm install
 node main.js
 ```
 
-输出示例：
-
-```
-[*] 题目：第18题 - JS 逆向 AES 动态加密
-[*] 目标：请求全部 5 页数据并将全部数字加和
-[+] 正在采集第 1/5 页...
-✓ 获取 10 条数据
-[+] 正在采集第 2/5 页...
-✓ 获取 10 条数据
-...
-[+] 采集完成，共 50 条数据
-
-========== 计算结果 ==========
-答案：XXXXXXX
-==============================
+```bash
+cd match_18
+node main.js
 ```
 
+```bash
+cd match_foundation_early
+npm install
+node main.js
+```
 
-## Skill：自动化解题 Agent
+## 脱敏约定
 
-`skill/yuanrenxue-js-reverse-agent/` 定义了一套端到端的自动化逆向分析工作流：
+为了方便公开分享，仓库现在统一遵循这些规则：
 
-| 阶段 | 说明 |
-|------|------|
-| **1. 侦察** | 抓取真实请求链路，区分热身请求与真实请求，识别登录态需求 |
-| **2. 静态分析** | 还原参数组装逻辑、加密依赖链，搜索 `sign`/`token`/`XMLHttpRequest`/`CryptoJS` 等关键词 |
-| **3. 动态验证** | 在浏览器中用 Hook/断点验证静态分析结论，定位 Browser vs Node 的首个分歧点 |
-| **4. Node 重建** | 构建纯 Node.js 协议级采集脚本，仅允许最小运行时 shim |
-| **5. 交付** | 运行脚本、计算答案、生成带证据的分析文档 |
+- 不提交真实 `sessionid`
+- 不提交本机绝对路径
+- 不提交可直接复用的实时挑战答案
+- 研究输出保留字段结构、调用顺序和长度特征，但会把敏感值替换成占位符
 
-**核心原则**：
-- 优先协议还原，环境模拟是最后手段
-- 每个关键结论必须有证据支撑（网络记录、Hook 输出、断点值、中间值对比）
-- 最终采集器必须是纯 Node.js，禁止浏览器自动化作为最终方案
+如果某个静态数据本身就是算法的一部分，比如 `foundation_do_data.json` 这类恢复后的运行时材料，则保留原样，因为删掉会直接破坏复现链路。
 
-> 需要配合 [`JSReverser-MCP`](https://github.com/NoOne-hub/JSReverser-MCP) 和 `chrome-devtool MCP` 使用。详见 [SKILL.md](./skill/yuanrenxue-js-reverse-agent/SKILL.md)。
+## Skill
 
-## 获取 sessionid
+仓库自带一个本地 skill：
 
-1. 登录 [猿人学](https://match.yuanrenxue.cn)
-2. 打开浏览器开发者工具（F12）
-3. 切换到 **Application** → **Storage** → **Cookies**
-4. 找到 `match.yuanrenxue.cn` 下的 `sessionid`，复制其值
+- [skill/yuanrenxue-js-reverse-agent/SKILL.md](./skill/yuanrenxue-js-reverse-agent/SKILL.md)
 
-> ⚠️ sessionid 有时效性，过期后需要重新登录获取。
+它的作用不是“自动给答案”，而是把猿人学题目的通用工作流固定下来：
+
+- 先侦察真实请求链
+- 再静态分析参数生成逻辑
+- 然后动态验证关键结论
+- 最后重建纯 Node.js 解法和分享型 README
+
+## 推荐阅读顺序
+
+如果你是第一次看这个仓库，建议按这个顺序学：
+
+1. 先看 [match_18](./match_18/)：加密链最直观，适合练习从接口到参数推导。
+2. 再看 [match_10](./match_10/)：理解“不是直接抄页面变量，而是还原页面接管的请求管线”。
+3. 再看 [match_11](./match_11/)：理解为什么“同样的代码，换轮次就会失效”，以及如何设计实时提取与绑定。
+4. 最后看 [match_foundation_early](./match_foundation_early/)：它最适合练习运行时拟合、白盒拆解和多算法候选恢复。
 
 ## 免责声明
 
-本项目仅供**学习交流**使用，用于研究 JavaScript 逆向工程和反爬虫技术原理。请勿用于任何商业用途或违反目标网站服务条款的行为。使用本项目所产生的一切后果由使用者自行承担。
-
-
-## ~~~~
-
-文档很乱后续整理
+本仓库仅用于相关内容分享。请勿用于任何违反目标站点规则或不当用途的场景。
