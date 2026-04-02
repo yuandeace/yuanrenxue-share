@@ -17,7 +17,7 @@
 - 对已经归类的算法族，可以自动求出答案。
 - 这份实现更偏“支持的轮次可自动求解”，还不是所有 fresh round 都能直接泛化。
 
-换句话说，这里最有价值的是分享材料和运行时拟合过程，而不是把它误解成“永不过期的通杀脚本”。
+换句话说，这里最有价值的是整理出来的过程材料和运行时拟合思路，而不是把它误解成“永不过期的通杀脚本”。
 
 ## 主流程
 
@@ -114,9 +114,9 @@ node main.js
 - `PUPPETEER_CORE_PATH`
 - `CHROME_PATH`
 
-如果你只是想看主算法分享，不需要先折腾这些工具；直接从 `main.js`、`utils/foundation_do.js`、`utils/foundation_ti.js` 和 `RUNTIME_NOTES.md` 看起就够了。
+如果你只是想先看主流程怎么跑通，不需要先折腾这些工具；直接从 `main.js`、`utils/foundation_do.js`、`utils/foundation_ti.js` 和 `RUNTIME_NOTES.md` 看起就够了。
 
-## 这题最值得分享的点
+## 这题最值得展开讲的点
 
 - 算法族不止一个时，先做候选恢复，不要过早押注。
 - 浏览器差异不一定出在大对象，往往卡在 `toString`、索引访问、`item()` 这种细节语义。
