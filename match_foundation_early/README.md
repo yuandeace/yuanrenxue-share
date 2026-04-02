@@ -1,105 +1,123 @@
 # foundation_early
 
-## 题目信息
+## 题目定位
 
-- 题号：突破题
-- 题目：五行灵气收集
-- 目标：收集金、火、木、水、土五种灵气，按 `金火木水土` 拼接后做 32 位小写 `md5`
-- 页面：`https://match.yuanrenxue.cn/match/foundation_early`
-- 登录态：需要 `sessionid`
+这个目录更适合拿来分享“运行时拟合 + 白盒还原 + 多算法候选恢复”。
 
-## 解题思路
+和第 10、18 题相比，这题不只是还原一个参数生成器，还需要同时处理：
 
-### 接口链路
+- `gold` / `earth` 的多算法解密族
+- `Do(serializedBody)` 的纯 Node 运行时复现
+- `Ti.encodeString()` 的白盒拆解
+- `sign/ts` 的请求签名构造
 
+## 当前状态
+
+- 已经能用纯 Node.js 跑通一部分轮次。
+- 对已经归类的算法族，可以自动求出答案。
+- 这份实现更偏“支持的轮次可自动求解”，还不是所有 fresh round 都能直接泛化。
+
+换句话说，这里最有价值的是分享材料和运行时拟合过程，而不是把它误解成“永不过期的通杀脚本”。
+
+## 主流程
+
+```text
+GET /match/foundation_early
+  -> 解析 key / cipher / earthCipher
+  -> 候选算法解 gold
+  -> fire = base64NoPad(gold)
+  -> wood = wood_reiki_yrx
+  -> serialized = 木=...&火=...&金=...
+  -> digest = Do(serialized)
+  -> sign = Ti.encodeString(digest, "/api/question/foundation_early|ts")
+  -> POST /api/question/foundation_early
+  -> 拿到 water
+  -> 用 water 解 earthCipher
+  -> answer = md5(gold + fire + wood + water + earth)
 ```
-GET /match/foundation_early → 页面 HTML（含 key + cipher + 土密文）
-    ↓
-候选算法解密 cipher → 金灵气
-    ↓
-Base64(金灵气, 去 padding) → 火灵气
-    ↓
-页面固定值 → 木灵气（wood_reiki_yrx）
-    ↓
-POST /api/question/foundation_early（带 sign + 金火木） → 水灵气
-    ↓
-水灵气作 key，解密土密文 → 土灵气
-    ↓
-拼接：金+火+木+水+土 → MD5 → 最终答案
-    ↓
-POST /a/foundation_early → 提交
+
+## 目录说明
+
+```text
+match_foundation_early/
+├── main.js
+├── README.md
+├── RUNTIME_NOTES.md
+├── package.json
+├── config/
+│   ├── encrypt.js
+│   └── foundation_do_data.json
+├── utils/
+│   ├── encrypt.js
+│   ├── foundation_do.js
+│   ├── foundation_ti.js
+│   └── request.js
+└── tools/
+    ├── foundation_do_compare.js
+    └── foundation_do_runtime.js
 ```
 
-### 关键发现
+- `main.js`
+  负责 fresh round 重试、计算答案、可选提交。
+- `config/foundation_do_data.json`
+  这是运行时还原所需的静态材料，属于算法输入的一部分，因此不做删减。
+- `config/encrypt.js`
+  保存脱敏后的已验证轮次字段模板和研究备注。
+- `utils/foundation_do.js`
+  用最小 DOM/定时器拟合去运行恢复后的 `Do`。
+- `utils/foundation_ti.js`
+  `Ti` 白盒后的可复用实现。
+- `RUNTIME_NOTES.md`
+  记录运行时差异、已确认算法族和脱敏后的研究结论。
+- `tools/`
+  更偏研究用途，不是最终求解入口。
 
-1. **多算法轮换**：题目不是固定一种加密算法，批量抓取多轮 `key/cipher` 后确认至少两类：
-   - 16 位 `key` → `AES-128-ECB`
-   - 8 位 `key` → `3DES-ECB`（raw key 补齐 24 字节）
-   - 脚本自动候选尝试，通过 `isPrintableAscii()` 判断解密结果是否有效
-
-2. **火灵气 = Base64(金灵气)**：去掉尾部 `=` padding
-
-3. **水灵气由服务端返回**：提交金+火+木后，服务端校验通过才会返回水灵气
-
-4. **土灵气解密**：水灵气作为 key，解密页面中的土密文，算法同样候选尝试
-
-5. **轮次绑定**：每次刷新页面会换轮次（新的 key/cipher），答案与当轮绑定
-
-## 使用方法
+## 运行
 
 ```bash
-# 安装依赖
+cd match_foundation_early
 npm install
+```
 
-# 配置 sessionid
-export SESSIONID="your_sessionid_here"
+只计算，不提交：
 
-# 运行（仅计算，不提交）
+```bash
+export SESSIONID="your_sessionid"
 node main.js
-
-# 运行并提交答案（仅当页面轮次匹配时才会真正提交）
-SUBMIT=1 node main.js
 ```
 
-> ⚠️ 当前脚本采用"已验证轮次复放"模式。如果页面已切换到新轮次，脚本会自动跳过提交，避免误提旧答案。
+增加 fresh round 尝试次数：
 
-## 核心机制
-
-### 候选解密
-
-```
-输入: key + cipher
-    ↓
-key 长度 == 16? → 尝试 AES-128-ECB
-    ↓
-尝试 3DES-ECB (raw key padded to 24 bytes)
-    ↓
-isPrintableAscii(result)? → 命中 → 返回
+```bash
+export SESSIONID="your_sessionid"
+export MAX_ATTEMPTS=50
+node main.js
 ```
 
-### 五行拼接
+计算并提交：
 
+```bash
+export SESSIONID="your_sessionid"
+export SUBMIT=1
+node main.js
 ```
-answer = md5(金 + 火 + 木 + 水 + 土)
-```
 
-其中火 = `base64NoPad(金)`，木 = 固定值 `wood_reiki_yrx`。
+## 研究工具说明
 
-## 待完善
+`tools/` 目录里的脚本已经去掉了作者本机绝对路径依赖，改成了环境变量控制：
 
-- `/api/question/foundation_early` 的 fresh-round `sign` 纯 Node 泛化还原尚未完成
-- 当前方案为"已验证成功轮次复放 + 轮次校验后提交"
+- `FE_ANALYSIS_DIR`
+  放调试转储文件的目录，默认是 `match_foundation_early/analysis_data`
+- `FE_PAUSE_DUMP`
+- `FE_CLOSURE_DUMP`
+- `FE_SAMPLE_DUMP`
+- `PUPPETEER_CORE_PATH`
+- `CHROME_PATH`
 
-## 文件说明
+如果你只是想看主算法分享，不需要先折腾这些工具；直接从 `main.js`、`utils/foundation_do.js`、`utils/foundation_ti.js` 和 `RUNTIME_NOTES.md` 看起就够了。
 
-```
-match_foundation_early/
-├── main.js                 # 入口：解密五行灵气 → 拼接 → MD5 → 可选提交
-├── package.json
-├── README.md               # 本文件
-├── config/
-│   └── encrypt.js          # 已验证轮次常量（已脱敏，需自行填入或用环境变量）
-└── utils/
-    ├── encrypt.js          # 加解密工具：AES-128-ECB、3DES-ECB、Base64、MD5
-    └── request.js          # 页面抓取、轮次 HTML 解析、答案提交
-```
+## 这题最值得学的点
+
+- 算法族不止一个时，先做候选恢复，不要过早押注。
+- 浏览器差异不一定出在大对象，往往卡在 `toString`、索引访问、`item()` 这种细节语义。
+- 运行时拟合不是“把浏览器全搬过去”，而是只补齐真正影响结果的那部分语义。
